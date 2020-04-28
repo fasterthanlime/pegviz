@@ -1,6 +1,6 @@
 # ptv
 
-peg trace view
+peg trace viewer
 
 ## Usage
 
