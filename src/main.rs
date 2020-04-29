@@ -245,7 +245,7 @@ impl Location {
             match c {
                 '\n' => {
                     line += 1;
-                    column = 0;
+                    column = 1;
                 }
                 _ => {
                     column += 1;
