@@ -1,19 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans&family=Ubuntu+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans&family=Source+Code+Pro&display=swap');
 
 body {
     font-family: 'Open Sans', sans-serif;
-    line-height: 1.4;
+    line-height: 1.6;
 }
 
 code {
     color: #fefefe;
-    font-family: 'Ubuntu Mono', monospace;
+    font-family: 'Source Code Pro', monospace;
 }
 
 code em, code strong, code span {
     background: #333;
-    border-radius: 2px;
-    padding: 2px;
+    padding-top: 2px;
+    padding-bottom: 2px;
 }
 
 code em {
@@ -23,8 +23,7 @@ code em {
 
 code strong {
     font-weight: normal;
-    background: #3f7d2a;
-    padding: 2px;
+    background: #3a5d9c;
     color: #fefefe;
 }
 
@@ -36,16 +35,35 @@ body {
 details {
     user-select: none;
     cursor: pointer;
-    padding-left: 25px;
+    padding-left: 30px;
 }
+
+summary {
+    padding-top: 2px;
+    padding-bottom: 2px;
+    opacity: 0.7;
+}
+
+summary:hover {
+    opacity: 1;
+}
+
 *:focus {
     outline: none;
 }
 
+span.rule {
+    padding-top: 2px;
+    padding-bottom: 2px;
+    font-family: 'Source Code Pro', monospace;
+    background: #333;
+    margin-right: 1em;
+}
+
 span.success {
-    color: #fefefe;
+    background-color: #27966d;
 }
 span.failure {
-    color: #888;
+    background-color: #942c2c;
     text-decoration: line-through;
 }

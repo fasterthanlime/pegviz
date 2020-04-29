@@ -260,7 +260,7 @@ fn visit(
         r#"
     <details>
         <summary>
-        <span class="{class}">{name}</span>
+        <span class="rule {class}">{name}</span>
         <code>"#,
         class = match node.state {
             State::Success => "success",
@@ -270,7 +270,7 @@ fn visit(
         name = rule.name
     )?;
 
-    let before = 20;
+    let before = 0;
     let after = 25;
     write!(
         f,
@@ -282,8 +282,7 @@ fn visit(
         }..rule.loc.pos(input)]
     )?;
     if let Some(next) = next_rule {
-        let diff = next.loc.pos(input) - rule.loc.pos(input);
-        if diff > 0 {
+        if next.loc.pos(input) > rule.loc.pos(input) {
             write!(
                 f,
                 r#"<strong>{}</strong>"#,
