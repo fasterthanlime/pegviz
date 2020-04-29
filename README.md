@@ -8,7 +8,20 @@ Visualizer for https://crates.io/crates/peg parsers.
 
 ## Screenshot
 
-![](https://user-images.githubusercontent.com/7998310/80624360-dccfaf00-8a4b-11ea-967b-5d14607b6592.png)
+`pegviz` reads peg's tracing markers and generates a collapsible HTML tree.
+
+![](https://user-images.githubusercontent.com/7998310/80628077-1fe05100-8a51-11ea-87aa-4b8362adf56c.png) 
+
+Left side:
+
+  * Green: matched rule
+  * Red: failed rule
+
+Right side:
+
+  * Gray: previous input, for context
+  * Blue background: input matched by this rule
+  * White text: rest of input after matching
 
 ## Format
 
@@ -16,18 +29,21 @@ Visualizer for https://crates.io/crates/peg parsers.
 
 ```
 [PEG_INPUT_START]
-typedef int bar;
-typedef int bar;
-
+int a = 12 + 45;
 [PEG_TRACE_START]
-[PEG_TRACE] Attempting to match rule translation_unit at 1:1 (pos 0)
-[PEG_TRACE] Attempting to match rule directive at 1:1 (pos 0)
-[PEG_TRACE] Failed to match rule directive at 1:1 (pos 0)
-[PEG_TRACE] Attempting to match rule _ at 1:1 (pos 0)
-[PEG_TRACE] Matched rule _ at 1:1 (pos 0)
-[PEG_TRACE] Attempting to match rule external_declaration at 1:1 (pos 0)
-(etc.)
-[PEG_TRACE_STOP]
+[PEG_TRACE] Attempting to match rule `translation_unit0` at 1:1
+[PEG_TRACE] Attempting to match rule `list0` at 1:1
+[PEG_TRACE] Attempting to match rule `node` at 1:1
+[PEG_TRACE] Attempting to match rule `external_declaration` at 1:1
+[PEG_TRACE] Attempting to match rule `declaration` at 1:1
+[PEG_TRACE] Attempting to match rule `node` at 1:1
+[PEG_TRACE] Attempting to match rule `declaration0` at 1:1
+[PEG_TRACE] Attempting to match rule `gnu` at 1:1
+[PEG_TRACE] Attempting to match rule `gnu_guard` at 1:1
+[PEG_TRACE] Failed to match rule `gnu_guard` at 1:1
+[PEG_TRACE] Failed to match rule `gnu` at 1:1
+[PEG_TRACE] Attempting to match rule `_` at 1:1
+[PEG_TRACE] Matched rule `_` at 1:1 to 1:1
 ```
 
 The `_START` and `_STOP` marker are pegviz-specific, you'll need to add
