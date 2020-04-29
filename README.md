@@ -113,3 +113,6 @@ Note that the `--output` argument is mandatory.
 
 The last step is to open the resulting HTML file in a browser and click around!
 
+## License
+
+pegviz is released under the MIT License. See the LICENSE file for details.
