@@ -2,6 +2,10 @@
 
 Visualizer for https://crates.io/crates/peg 0.6.x parsers.
 
+## Screenshot
+
+![](https://user-images.githubusercontent.com/7998310/80624360-dccfaf00-8a4b-11ea-967b-5d14607b6592.png)
+
 ## Usage
 
 In your crate, re-export the `trace` feature:
@@ -52,6 +56,3 @@ cargo run --features trace | pegviz --output ./pegviz.html
 
 Then open `pegviz.html` in a browser.
 
-## Screenshot
-
-![](https://user-images.githubusercontent.com/7998310/80550548-b6b0fd00-89c0-11ea-8c47-ee1cee972aeb.png)
