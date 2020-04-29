@@ -80,6 +80,29 @@ struct Args {
     #[argh(option, short = 'o')]
     /// output path, "./trace.html" for example
     output: PathBuf,
+
+    #[argh(option)]
+    /// name of rules to collapse - if they exactly only 1 children,
+    /// only their children will be shown
+    collapse: Vec<String>,
+
+    #[argh(option)]
+    /// name of rules to hide altogether
+    hide: Vec<String>,
+}
+
+impl Args {
+    fn should_collapse(&self, node: &Node) -> bool {
+        self.collapse
+            .iter()
+            .find(|&x| x == &node.rule.name)
+            .is_some()
+            && node.children.len() == 1
+    }
+
+    fn should_hide(&self, node: &Node) -> bool {
+        self.hide.iter().find(|&x| x == &node.rule.name).is_some()
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -103,18 +126,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         match state {
             ParseState::WaitingForInputStart => {
                 if line == "[PEG_INPUT_START]" {
-                    println!("=======================================");
                     println!("= pegviz input start");
-                    println!("=======================================");
                     state = ParseState::ReadingInput;
                     continue;
                 }
             }
             ParseState::ReadingInput => {
                 if line == "[PEG_TRACE_START]" {
-                    println!("=======================================");
                     println!("= pegviz trace start");
-                    println!("=======================================");
                     state = ParseState::ReadingTrace;
                     stack.push(Node {
                         rule: Rule {
@@ -132,12 +151,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 writeln!(&mut input, "{}", line)?;
             }
             ParseState::ReadingTrace => {
-                println!("readingtrace, line = {}", line);
-
                 if line == "[PEG_TRACE_STOP]" {
-                    println!("=======================================");
                     println!("= pegviz trace stop");
-                    println!("=======================================");
                     assert_eq!(stack.len(), 1);
                     let root = stack.pop().unwrap();
                     traces.push((root, input.clone()));
@@ -149,13 +164,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let t = match tracer::line(&line) {
                     Ok(t) => t,
                     Err(e) => {
-                        println!("=======================================");
                         println!("= pegviz error:\nfor line {}\n{:#?}", line, e);
-                        println!("=======================================");
                         return Ok(());
                     }
                 };
-                println!("read: {:#?}", t);
 
                 match t {
                     Line::Attempt(rule) => {
@@ -205,7 +217,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     for trace in &traces {
         let (root, input) = &trace;
-        visit(&mut out, root, None, input)?;
+        visit(&mut out, &args, root, None, input)?;
     }
     writeln!(
         &mut out,
@@ -215,9 +227,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     "#
     )?;
 
-    println!("=======================================");
     println!("= pegviz generated to {}", args.output.display());
-    println!("=======================================");
 
     Ok(())
 }
@@ -248,10 +258,15 @@ impl Location {
 
 fn visit(
     f: &mut dyn Write,
+    args: &Args,
     node: &Node,
     next: Option<&Node>,
     input: &str,
 ) -> Result<(), Box<dyn Error>> {
+    if args.should_collapse(node) {
+        return visit(f, args, &node.children[0], next, input);
+    }
+
     let rule = &node.rule;
 
     let next_rule = next.map(|n| &n.rule);
@@ -270,7 +285,7 @@ fn visit(
         name = rule.name
     )?;
 
-    let before = 0;
+    let before = 10;
     let after = 25;
     write!(
         f,
@@ -281,42 +296,51 @@ fn visit(
             rule.loc.pos(input) - before
         }..rule.loc.pos(input)]
     )?;
+    let rulepos = rule.loc.pos(input);
     if let Some(next) = next_rule {
-        if next.loc.pos(input) > rule.loc.pos(input) {
-            write!(
-                f,
-                r#"<strong>{}</strong>"#,
-                &input[rule.loc.pos(input)..next.loc.pos(input)]
-            )?;
+        let nextpos = next.loc.pos(input);
+        if nextpos > rulepos {
+            write!(f, r#"<strong>{}</strong>"#, &input[rulepos..nextpos])?;
+        } else if nextpos < rulepos {
+            write!(f, r#"↩"#)?;
         }
         write!(
             f,
-            r#"<span>{}</span>"#,
-            &input[next.loc.pos(input)..std::cmp::min(next.loc.pos(input) + after, input.len())]
+            r#"<span>{}{}</span>"#,
+            &input[nextpos..std::cmp::min(nextpos + after, input.len())],
+            if input.len() > nextpos + after {
+                "…"
+            } else {
+                ""
+            }
         )?;
     } else {
         write!(
             f,
-            r#"<span>{}</span>"#,
-            &input[rule.loc.pos(input)..std::cmp::min(rule.loc.pos(input) + after, input.len())]
+            r#"<span>{}{}</span>"#,
+            &input[rulepos..std::cmp::min(rulepos + after, input.len())],
+            if input.len() > rulepos + after {
+                "…"
+            } else {
+                ""
+            }
         )?;
     }
 
     writeln!(f, "</code></summary>")?;
     let mut prev_child = None;
     for child in &node.children {
-        // TODO: enable filters?
-        // if child.rule.name == "_" || child.rule.name.ends_with("_guard") {
-        //     continue;
-        // }
+        if args.should_hide(child) {
+            continue;
+        }
 
         if let Some(prev) = prev_child {
-            visit(f, prev, Some(child), input)?;
+            visit(f, args, prev, Some(child), input)?;
         }
         prev_child = Some(child);
     }
     if let Some(prev) = prev_child {
-        visit(f, prev, next, input)?;
+        visit(f, args, prev, next, input)?;
     }
     writeln!(f, "</details>")?;
 
