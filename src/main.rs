@@ -127,20 +127,30 @@ fn main() -> Result<(), Box<dyn Error>> {
         r#"
     body {
         font-family: 'Open Sans', sans-serif;
+        line-height: 1.4;
     }
 
     code {
         color: #fefefe;
-        border: 2px solid #777;
-        background: #333;
-        padding: 2px;
-        border-radius: 2px;
         font-family: 'Ubuntu Mono', monospace;
+    }
+
+    code em, code strong, code span {
+        background: #333;
+        border-radius: 2px;
+        padding: 2px;
+    }
+
+    code em {
+        font-style: initial;
+        color: #676767;
     }
 
     code strong {
         font-weight: normal;
-        color: #777;
+        background: #3f7d2a;
+        padding: 2px;
+        color: #fefefe;
     }
 
     body {
@@ -149,10 +159,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     details {
-        border: 1px solid #333;
         user-select: none;
         cursor: pointer;
-        padding-left: 20px;
+        padding-left: 25px;
     }
     *:focus {
         outline: none;
@@ -170,7 +179,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("</head>");
     println!("<body>");
     for child in &root.children {
-        visit(child, &source_file);
+        visit(child, None, &source_file);
     }
     println!("</body>");
     println!("</html>");
@@ -178,15 +187,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn visit(node: &Node, source_file: &str) {
+fn visit(node: &Node, next: Option<&Node>, source_file: &str) {
     let rule = match node.rule.as_ref() {
         Some(rule) => rule,
         None => return,
     };
-    if rule.name == "_" || rule.name.ends_with("_guard") {
-        return;
-    }
 
+    let next_rule = next.and_then(|n| n.rule.as_ref());
     println!("<details>",);
     println!("<summary>");
     print!(
@@ -199,23 +206,54 @@ fn visit(node: &Node, source_file: &str) {
         name = rule.name
     );
     // println!(" at {}:{}", rule.loc.line, rule.loc.column);
-    println!(" <code>");
-    println!(
-        "<strong>{}</strong>",
-        &source_file[if rule.loc.pos < 20 {
+    print!(" <code>");
+
+    let before = 20;
+    let after = 25;
+    print!(
+        r#"<em>{}</em>"#,
+        &source_file[if rule.loc.pos < before {
             0
         } else {
-            rule.loc.pos - 20
+            rule.loc.pos - before
         }..rule.loc.pos]
     );
-    println!(
-        "{}",
-        &source_file[rule.loc.pos..std::cmp::min(rule.loc.pos + 20, source_file.len())]
-    );
+    if let Some(next) = next_rule {
+        print!(
+            r#"<strong>{}</strong>"#,
+            &source_file[rule.loc.pos..next.loc.pos]
+        );
+        print!(
+            r#"<span>{}</span>"#,
+            &source_file[next.loc.pos..std::cmp::min(next.loc.pos + after, source_file.len())]
+        );
+    } else {
+        print!(
+            r#"<span>{}</span>"#,
+            &source_file[rule.loc.pos..std::cmp::min(rule.loc.pos + after, source_file.len())]
+        );
+    }
+
     println!("</code>");
     println!("</summary>");
+    let mut prev_child = None;
     for child in &node.children {
-        visit(child, source_file)
+        let child_rule = match child.rule.as_ref() {
+            Some(rule) => rule,
+            None => continue,
+        };
+        if child_rule.name == "_" || child_rule.name.ends_with("_guard") {
+            continue;
+        }
+
+        if let Some(prev) = prev_child {
+            visit(prev, Some(child), source_file);
+        }
+        prev_child = Some(child);
     }
+    if let Some(prev) = prev_child {
+        visit(prev, next, source_file);
+    }
+
     println!("</details>");
 }
