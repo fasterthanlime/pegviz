@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans&family=Ubuntu+Mono:wght@400;700&display=swap');
+
+body {
+    font-family: 'Open Sans', sans-serif;
+    line-height: 1.4;
+}
+
+code {
+    color: #fefefe;
+    font-family: 'Ubuntu Mono', monospace;
+}
+
+code em, code strong, code span {
+    background: #333;
+    border-radius: 2px;
+    padding: 2px;
+}
+
+code em {
+    font-style: initial;
+    color: #676767;
+}
+
+code strong {
+    font-weight: normal;
+    background: #3f7d2a;
+    padding: 2px;
+    color: #fefefe;
+}
+
+body {
+    background: #111;
+    color: white;
+}
+
+details {
+    user-select: none;
+    cursor: pointer;
+    padding-left: 25px;
+}
+*:focus {
+    outline: none;
+}
+
+span.success {
+    color: #fefefe;
+}
+span.failure {
+    color: #777;
+}

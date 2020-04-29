@@ -1,4 +1,10 @@
-use std::error::Error;
+use argh::FromArgs;
+use std::{
+    error::Error,
+    fs::File,
+    io::{BufRead, Write},
+    path::PathBuf,
+};
 
 #[derive(Debug)]
 enum State {
@@ -16,7 +22,7 @@ struct Location {
 
 #[derive(Debug)]
 struct Node {
-    rule: Option<Rule>,
+    rule: Rule,
     state: State,
     children: Vec<Node>,
 }
@@ -70,190 +76,193 @@ peg::parser! {
     }
 }
 
+#[derive(FromArgs)]
+/// Creates an HTML visualization for a trace generated from https://crates.io/crates/peg
+struct Args {
+    #[argh(option, short = 'o')]
+    /// output path, "./trace.html" for example
+    output: PathBuf,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut args = std::env::args().skip(1);
+    let args: Args = argh::from_env();
 
-    let trace_file = args.next().unwrap();
-    let source_file = args.next().unwrap();
-
-    let trace_file = std::fs::read_to_string(trace_file)?;
-    let source_file = std::fs::read_to_string(source_file)?;
-
+    enum ParseState {
+        WaitingForInputStart,
+        ReadingInput,
+        ReadingTrace,
+    }
+    let mut state = ParseState::WaitingForInputStart;
     let mut stack: Vec<Node> = vec![Node {
-        rule: None,
+        rule: Rule {
+            name: "Root".into(),
+            loc: Location {
+                column: 0,
+                line: 0,
+                pos: 0,
+            },
+        },
         state: State::Success,
         children: vec![],
     }];
+    let mut input = String::new();
 
-    for line in trace_file.lines() {
-        let t = match tracer::line(line) {
-            Ok(t) => t,
-            Err(_) => continue,
-        };
-        match t {
-            Line::Attempt(rule) => {
-                let node = Node {
-                    rule: Some(rule),
-                    state: State::Unknown,
-                    children: vec![],
+    let stdin = std::io::stdin();
+    'each_line: for line in stdin.lock().lines() {
+        let line = line?;
+
+        match state {
+            ParseState::WaitingForInputStart => {
+                if line == "[PEG_INPUT_START]" {
+                    state = ParseState::ReadingInput;
+                }
+            }
+            ParseState::ReadingInput => {
+                if line == "[PEG_TRACE_START]" {
+                    state = ParseState::ReadingTrace;
+                } else {
+                    use std::fmt::Write;
+                    writeln!(&mut input, "{}", line)?;
+                }
+            }
+            ParseState::ReadingTrace => {
+                let t = match tracer::line(&line) {
+                    Ok(t) => t,
+                    Err(_) => break 'each_line,
                 };
-                stack.push(node);
-            }
-            Line::Success => {
-                let mut node = stack.pop().unwrap();
-                node.state = State::Success;
-                stack.last_mut().unwrap().children.push(node);
-            }
-            Line::Failure => {
-                let mut node = stack.pop().unwrap();
-                node.state = State::Failure;
-                stack.last_mut().unwrap().children.push(node);
+
+                match t {
+                    Line::Attempt(rule) => {
+                        let node = Node {
+                            rule,
+                            state: State::Unknown,
+                            children: vec![],
+                        };
+                        stack.push(node);
+                    }
+                    Line::Success => {
+                        let mut node = stack.pop().unwrap();
+                        node.state = State::Success;
+                        stack.last_mut().unwrap().children.push(node);
+                    }
+                    Line::Failure => {
+                        let mut node = stack.pop().unwrap();
+                        node.state = State::Failure;
+                        stack.last_mut().unwrap().children.push(node);
+                    }
+                }
             }
         }
     }
 
+    if input.is_empty() {
+        println!("pegviz: empty code, exiting");
+        return Ok(());
+    }
+
     let root = stack.pop().unwrap();
+    if root.children.is_empty() {
+        println!("pegviz: no trace, exiting");
+        return Ok(());
+    }
 
-    println!("<html>");
-    println!("<head>");
-    println!(
+    let mut out = File::create(&args.output)?;
+
+    writeln!(
+        &mut out,
         r#"
-        <link href="https://fonts.googleapis.com/css2?family=Open+Sans&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet">
-    "#
-    );
-    println!("<style>");
-    println!(
-        "{}",
-        r#"
-    body {
-        font-family: 'Open Sans', sans-serif;
-        line-height: 1.4;
-    }
-
-    code {
-        color: #fefefe;
-        font-family: 'Ubuntu Mono', monospace;
-    }
-
-    code em, code strong, code span {
-        background: #333;
-        border-radius: 2px;
-        padding: 2px;
-    }
-
-    code em {
-        font-style: initial;
-        color: #676767;
-    }
-
-    code strong {
-        font-weight: normal;
-        background: #3f7d2a;
-        padding: 2px;
-        color: #fefefe;
-    }
-
-    body {
-        background: #111;
-        color: white;
-    }
-
-    details {
-        user-select: none;
-        cursor: pointer;
-        padding-left: 25px;
-    }
-    *:focus {
-        outline: none;
-    }
-
-    span.success {
-        color: #fefefe;
-    }
-    span.failure {
-        color: #777;
-    }
-    "#
-    );
-    println!("</style>");
-    println!("</head>");
-    println!("<body>");
+    <html>
+        <head>
+            <style>{style}</style>
+        </head>
+        <body>
+    "#,
+        style = include_str!("style.css")
+    )?;
     for child in &root.children {
-        visit(child, None, &source_file);
+        visit(&mut out, child, None, &input)?;
     }
-    println!("</body>");
-    println!("</html>");
+    writeln!(
+        &mut out,
+        r#"
+        </body>
+    </html>
+    "#
+    )?;
 
     Ok(())
 }
 
-fn visit(node: &Node, next: Option<&Node>, source_file: &str) {
-    let rule = match node.rule.as_ref() {
-        Some(rule) => rule,
-        None => return,
-    };
+fn visit(
+    f: &mut dyn Write,
+    node: &Node,
+    next: Option<&Node>,
+    code: &str,
+) -> Result<(), Box<dyn Error>> {
+    let rule = &node.rule;
 
-    let next_rule = next.and_then(|n| n.rule.as_ref());
-    println!("<details>",);
-    println!("<summary>");
-    print!(
-        "<span class={class:?}>{name}<span/>",
+    let next_rule = next.map(|n| &n.rule);
+    write!(
+        f,
+        r#"
+    <details>
+        <summary>
+        <span class="{class:?}">{name}</span>
+        <code>"#,
         class = match node.state {
             State::Success => "success",
             State::Failure => "failure",
             State::Unknown => "unknown",
         },
         name = rule.name
-    );
-    // println!(" at {}:{}", rule.loc.line, rule.loc.column);
-    print!(" <code>");
+    )?;
 
     let before = 20;
     let after = 25;
-    print!(
+    write!(
+        f,
         r#"<em>{}</em>"#,
-        &source_file[if rule.loc.pos < before {
+        &code[if rule.loc.pos < before {
             0
         } else {
             rule.loc.pos - before
         }..rule.loc.pos]
-    );
+    )?;
     if let Some(next) = next_rule {
-        print!(
+        write!(
+            f,
             r#"<strong>{}</strong>"#,
-            &source_file[rule.loc.pos..next.loc.pos]
-        );
-        print!(
+            &code[rule.loc.pos..next.loc.pos]
+        )?;
+        write!(
+            f,
             r#"<span>{}</span>"#,
-            &source_file[next.loc.pos..std::cmp::min(next.loc.pos + after, source_file.len())]
-        );
+            &code[next.loc.pos..std::cmp::min(next.loc.pos + after, code.len())]
+        )?;
     } else {
-        print!(
+        write!(
+            f,
             r#"<span>{}</span>"#,
-            &source_file[rule.loc.pos..std::cmp::min(rule.loc.pos + after, source_file.len())]
-        );
+            &code[rule.loc.pos..std::cmp::min(rule.loc.pos + after, code.len())]
+        )?;
     }
 
-    println!("</code>");
-    println!("</summary>");
+    writeln!(f, "</code></summary>")?;
     let mut prev_child = None;
     for child in &node.children {
-        let child_rule = match child.rule.as_ref() {
-            Some(rule) => rule,
-            None => continue,
-        };
-        if child_rule.name == "_" || child_rule.name.ends_with("_guard") {
+        if child.rule.name == "_" || child.rule.name.ends_with("_guard") {
             continue;
         }
 
         if let Some(prev) = prev_child {
-            visit(prev, Some(child), source_file);
+            visit(f, prev, Some(child), code)?;
         }
         prev_child = Some(child);
     }
     if let Some(prev) = prev_child {
-        visit(prev, next, source_file);
+        visit(f, prev, next, code)?;
     }
+    writeln!(f, "</details>")?;
 
-    println!("</details>");
+    Ok(())
 }
