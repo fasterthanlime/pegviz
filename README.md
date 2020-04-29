@@ -1,6 +1,6 @@
 # pegviz
 
-Visualizer for https://crates.io/crates/peg parsers.
+Visualizer for https://crates.io/crates/peg 0.6.x parsers.
 
 ## Usage
 
@@ -19,19 +19,18 @@ and outputs the markers `pegviz` is looking for:
 ```rust
 peg::parser! { pub grammar example() for str {
 
-pub rule toplevel() -> Toplevel =
-    &tracing()
-    t:toplevel0() { t }
-
-rule tracing() =
-    input:$([_]*) {
+rule traced<T>(e: rule<T>) -> T =
+    &(input:$([_]*) {
         #[cfg(feature = "trace")]
-        {
-            println!("[PEG_INPUT_START]");
-            println!("{}", input);
-            println!("[PEG_TRACE_START]");
-        }
+        println!("[PEG_INPUT_START]\n{}\n[PEG_TRACE_START]", input);
+    })
+    e:e()? {?
+        #[cfg(feature = "trace")]
+        println!("[PEG_TRACE_STOP]");
+        e.ok_or("")
     }
+
+pub rule toplevel() -> Toplevel = traced(<toplevel0()>)
 
 }}
 ```
@@ -43,15 +42,15 @@ cd pegviz/
 cargo install --force --path .
 ```
 
-...simply run your program, piping its standard output
-to `pegviz`, and specifying an output file:
+...simply run your program with the `trace` Cargo feature enabled, and pipe
+its standard output to `pegviz`, and specifying an output file:
 
 ```shell
 cd example/
-cargo run --features trace | pegviz --output ./viz.html
+cargo run --features trace | pegviz --output ./pegviz.html
 ```
 
-Then open `viz.html` in a browser.
+Then open `pegviz.html` in a browser.
 
 ## Screenshot
 

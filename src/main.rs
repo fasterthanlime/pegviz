@@ -17,7 +17,6 @@ enum State {
 struct Location {
     line: usize,
     column: usize,
-    pos: usize,
 }
 
 #[derive(Debug)]
@@ -60,13 +59,12 @@ peg::parser! {
             = "Attempting to match rule " r:node() { r }
 
         rule node() -> Rule
-            = name:$(['A'..='Z' | 'a'..='z' | '0'..='9' | '_']+) " at " line:int() ":" column:int() " (pos " pos:int() ")" {
+            = "`" name:$(['A'..='Z' | 'a'..='z' | '0'..='9' | '_']*) "` at " line:int() ":" column:int() {
             Rule {
                 name: name.into(),
                 loc: Location {
                     line,
                     column,
-                    pos,
                 }
             }
         }
@@ -93,43 +91,71 @@ fn main() -> Result<(), Box<dyn Error>> {
         ReadingTrace,
     }
     let mut state = ParseState::WaitingForInputStart;
-    let mut stack: Vec<Node> = vec![Node {
-        rule: Rule {
-            name: "Root".into(),
-            loc: Location {
-                column: 0,
-                line: 0,
-                pos: 0,
-            },
-        },
-        state: State::Success,
-        children: vec![],
-    }];
+    let mut traces: Vec<(Node, String)> = Default::default();
+    let mut stack: Vec<Node> = vec![];
     let mut input = String::new();
+    let mut trace_number = 1;
 
     let stdin = std::io::stdin();
-    'each_line: for line in stdin.lock().lines() {
+    for line in stdin.lock().lines() {
         let line = line?;
 
         match state {
             ParseState::WaitingForInputStart => {
                 if line == "[PEG_INPUT_START]" {
+                    println!("=======================================");
+                    println!("= pegviz input start");
+                    println!("=======================================");
                     state = ParseState::ReadingInput;
+                    continue;
                 }
             }
             ParseState::ReadingInput => {
                 if line == "[PEG_TRACE_START]" {
+                    println!("=======================================");
+                    println!("= pegviz trace start");
+                    println!("=======================================");
                     state = ParseState::ReadingTrace;
-                } else {
-                    use std::fmt::Write;
-                    writeln!(&mut input, "{}", line)?;
+                    stack.push(Node {
+                        rule: Rule {
+                            name: format!("Trace #{}", trace_number),
+                            loc: Location { column: 0, line: 0 },
+                        },
+                        state: State::Success,
+                        children: vec![],
+                    });
+                    trace_number += 1;
+                    continue;
                 }
+
+                use std::fmt::Write;
+                writeln!(&mut input, "{}", line)?;
             }
             ParseState::ReadingTrace => {
+                println!("readingtrace, line = {}", line);
+
+                if line == "[PEG_TRACE_STOP]" {
+                    println!("=======================================");
+                    println!("= pegviz trace stop");
+                    println!("=======================================");
+                    assert_eq!(stack.len(), 1);
+                    let root = stack.pop().unwrap();
+                    traces.push((root, input.clone()));
+                    input.clear();
+                    state = ParseState::WaitingForInputStart;
+                    continue;
+                }
+
                 let t = match tracer::line(&line) {
                     Ok(t) => t,
-                    Err(_) => break 'each_line,
+                    Err(e) => {
+                        println!("=======================================");
+                        println!("= pegviz error:\nfor line {}\n{:#?}", line, e);
+                        println!("=======================================");
+                        return Ok(());
+                    }
                 };
+                println!("read: {:#?}", t);
 
                 match t {
                     Line::Attempt(rule) => {
@@ -141,6 +167,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                         stack.push(node);
                     }
                     Line::Success => {
+                        if stack.len() < 2 {
+                            continue;
+                        }
                         let mut node = stack.pop().unwrap();
                         node.state = State::Success;
                         stack.last_mut().unwrap().children.push(node);
@@ -155,13 +184,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if input.is_empty() {
-        println!("pegviz: empty code, exiting");
-        return Ok(());
-    }
+    println!("=======================================");
+    println!("= pegviz input stop");
+    println!("=======================================");
 
-    let root = stack.pop().unwrap();
-    if root.children.is_empty() {
+    if traces.is_empty() {
         println!("pegviz: no trace, exiting");
         return Ok(());
     }
@@ -179,8 +206,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     "#,
         style = include_str!("style.css")
     )?;
-    for child in &root.children {
-        visit(&mut out, child, None, &input)?;
+    for trace in &traces {
+        let (root, input) = &trace;
+        visit(&mut out, root, None, input)?;
     }
     writeln!(
         &mut out,
@@ -190,14 +218,42 @@ fn main() -> Result<(), Box<dyn Error>> {
     "#
     )?;
 
+    println!("=======================================");
+    println!("= pegviz generated to {}", args.output.display());
+    println!("=======================================");
+
     Ok(())
+}
+
+impl Location {
+    fn pos(&self, input: &str) -> usize {
+        let mut line = 1;
+        let mut column = 1;
+
+        for (i, c) in input.chars().enumerate() {
+            if line == self.line && column == self.column {
+                return i;
+            }
+
+            match c {
+                '\n' => {
+                    line += 1;
+                    column = 0;
+                }
+                _ => {
+                    column += 1;
+                }
+            }
+        }
+        0
+    }
 }
 
 fn visit(
     f: &mut dyn Write,
     node: &Node,
     next: Option<&Node>,
-    code: &str,
+    input: &str,
 ) -> Result<(), Box<dyn Error>> {
     let rule = &node.rule;
 
@@ -222,47 +278,58 @@ fn visit(
     write!(
         f,
         r#"<em>{}</em>"#,
-        &code[if rule.loc.pos < before {
+        &input[if rule.loc.pos(input) < before {
             0
         } else {
-            rule.loc.pos - before
-        }..rule.loc.pos]
+            rule.loc.pos(input) - before
+        }..rule.loc.pos(input)]
     )?;
     if let Some(next) = next_rule {
-        write!(
-            f,
-            r#"<strong>{}</strong>"#,
-            &code[rule.loc.pos..next.loc.pos]
-        )?;
+        let diff = next.loc.pos(input) - rule.loc.pos(input);
+        if diff > 0 {
+            write!(
+                f,
+                r#"<strong>{}</strong>"#,
+                &input[rule.loc.pos(input)..next.loc.pos(input)]
+            )?;
+        }
         write!(
             f,
             r#"<span>{}</span>"#,
-            &code[next.loc.pos..std::cmp::min(next.loc.pos + after, code.len())]
+            &input[next.loc.pos(input)..std::cmp::min(next.loc.pos(input) + after, input.len())]
         )?;
     } else {
         write!(
             f,
             r#"<span>{}</span>"#,
-            &code[rule.loc.pos..std::cmp::min(rule.loc.pos + after, code.len())]
+            &input[rule.loc.pos(input)..std::cmp::min(rule.loc.pos(input) + after, input.len())]
         )?;
     }
 
     writeln!(f, "</code></summary>")?;
     let mut prev_child = None;
     for child in &node.children {
-        if child.rule.name == "_" || child.rule.name.ends_with("_guard") {
-            continue;
-        }
+        // TODO: enable filters?
+        // if child.rule.name == "_" || child.rule.name.ends_with("_guard") {
+        //     continue;
+        // }
 
         if let Some(prev) = prev_child {
-            visit(f, prev, Some(child), code)?;
+            visit(f, prev, Some(child), input)?;
         }
         prev_child = Some(child);
     }
     if let Some(prev) = prev_child {
-        visit(f, prev, next, code)?;
+        visit(f, prev, next, input)?;
     }
     writeln!(f, "</details>")?;
 
     Ok(())
+}
+
+use ctor::ctor;
+
+#[ctor]
+fn install_extensions() {
+    color_backtrace::install();
 }
