@@ -46,5 +46,6 @@ span.success {
     color: #fefefe;
 }
 span.failure {
-    color: #777;
+    color: #888;
+    text-decoration: line-through;
 }

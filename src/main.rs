@@ -167,9 +167,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                         stack.push(node);
                     }
                     Line::Success => {
-                        if stack.len() < 2 {
-                            continue;
-                        }
                         let mut node = stack.pop().unwrap();
                         node.state = State::Success;
                         stack.last_mut().unwrap().children.push(node);
@@ -263,7 +260,7 @@ fn visit(
         r#"
     <details>
         <summary>
-        <span class="{class:?}">{name}</span>
+        <span class="{class}">{name}</span>
         <code>"#,
         class = match node.state {
             State::Success => "success",
