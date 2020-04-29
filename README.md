@@ -1,7 +1,7 @@
 # pegviz
 
-![](https://img.shields.io/badge/quick%20hack%3F-yes-blue)
-![](https://img.shields.io/badge/maintained%3F-not--really-orange)
+![](https://img.shields.io/badge/quick%20hack%3F-yes!-green)
+![](https://img.shields.io/badge/maintained%3F-not%20really-red)
 ![](https://img.shields.io/badge/license-mit-blue)
 
 Visualizer for https://crates.io/crates/peg parsers.
