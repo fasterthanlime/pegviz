@@ -37,6 +37,9 @@ enum Line {
     Attempt(Rule),
     Failure,
     Success,
+    Cache,
+    EnterLevel,
+    LeaveLevel,
 }
 
 peg::parser! {
@@ -46,14 +49,26 @@ peg::parser! {
 
         rule line0() -> Line
             = r:attempt() { Line::Attempt(r) }
+            / cach() { Line::Cache }
+            / enter() { Line::EnterLevel }
+            / leave() { Line::LeaveLevel }
             / fail() { Line::Failure }
             / succ() { Line::Success }
 
         rule fail()
             = "Failed to match rule " [_]*
 
+        rule cach()
+            = "Cached match of rule " [_]*
+
         rule succ()
             = "Matched rule " [_]*
+
+        rule enter()
+            = "Entering level " [_]*
+
+        rule leave()
+            = "Leaving level " [_]*
 
         rule attempt() -> Rule
             = "Attempting to match rule " r:node() { r }
@@ -188,6 +203,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                         node.state = State::Failure;
                         stack.last_mut().unwrap().children.push(node);
                     }
+                    Line::Cache => {}
+                    Line::EnterLevel => {}
+                    Line::LeaveLevel => {}
                 }
             }
         }
