@@ -48,7 +48,7 @@ peg::parser! {
             = "[PEG_TRACE] " l:line0() { l }
 
         rule line0() -> Line
-            = r:attempt() { Line::Attempt(r) }
+            = a:attempt() { Line::Attempt(a) }
             / cach() { Line::Cache }
             / enter() { Line::EnterLevel }
             / leave() { Line::LeaveLevel }
@@ -71,18 +71,25 @@ peg::parser! {
             = "Leaving level " [_]*
 
         rule attempt() -> Rule
-            = "Attempting to match rule " r:node() { r }
-
-        rule node() -> Rule
-            = "`" name:$(['A'..='Z' | 'a'..='z' | '0'..='9' | '_']*) "` at " line:int() ":" column:int() {
-            Rule {
-                name: name.into(),
-                loc: Location {
-                    line,
-                    column,
+            = "Attempting to match rule " name:name() " at " loc:location() (" (pos " int() ")")? {
+                Rule {
+                    name: name.into(),
+                    loc,
                 }
             }
-        }
+
+        rule backquoted<T>(e: rule<T>) -> T
+            = "`" e:e() "`" { e }
+
+        rule name() -> &'input str
+            = n:backquoted(<identifier()>) { n }
+            / n:identifier() { n }
+
+        rule identifier() -> &'input str
+            = $(['A'..='Z' | 'a'..='z' | '0'..='9' | '_']*)
+
+        rule location() -> Location
+            = line:int() ":" column:int() { Location { line, column } }
 
         rule int() -> usize
             = digits:$(['0'..='9']+) { digits.parse().unwrap() }
@@ -179,7 +186,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let t = match tracer::line(&line) {
                     Ok(t) => t,
                     Err(e) => {
-                        println!("= pegviz error:\nfor line {}\n{:#?}", line, e);
+                        println!("= pegviz error:\nfor line\n|  {}\n{:#?}", line, e);
                         return Ok(());
                     }
                 };
