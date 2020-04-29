@@ -82,9 +82,9 @@ struct Args {
     output: PathBuf,
 
     #[argh(option)]
-    /// name of rules to collapse - if they exactly only 1 children,
-    /// only their children will be shown
-    collapse: Vec<String>,
+    /// name of rules to flatten - if they have only a single child,
+    /// then only the child will appear in the tree
+    flatten: Vec<String>,
 
     #[argh(option)]
     /// name of rules to hide altogether
@@ -92,8 +92,8 @@ struct Args {
 }
 
 impl Args {
-    fn should_collapse(&self, node: &Node) -> bool {
-        self.collapse
+    fn should_flatten(&self, node: &Node) -> bool {
+        self.flatten
             .iter()
             .find(|&x| x == &node.rule.name)
             .is_some()
@@ -263,7 +263,7 @@ fn visit(
     next: Option<&Node>,
     input: &str,
 ) -> Result<(), Box<dyn Error>> {
-    if args.should_collapse(node) {
+    if args.should_flatten(node) {
         return visit(f, args, &node.children[0], next, input);
     }
 
