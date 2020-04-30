@@ -300,8 +300,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     writeln!(
         &mut out,
         r#"
-    <html>
+    <!DOCTYPE html>
+    <html lang="en">
         <head>
+        <meta charset="utf-8"/>
             <style>{style}</style>
         </head>
         <body>
