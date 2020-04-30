@@ -5,6 +5,9 @@ authors = ["Amos Wenger <amoswenger@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 
+[features]
+debug-backfill = []
+
 [dependencies]
 peg = "0.6.2"
 argh = "0.1.3"

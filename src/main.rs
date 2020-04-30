@@ -1,8 +1,10 @@
 use argh::FromArgs;
 use std::{
+    cmp::Ordering,
     error::Error,
+    fmt,
     fs::File,
-    io::{BufRead, Write},
+    io::{BufRead, BufReader, Write},
     path::PathBuf,
 };
 
@@ -13,10 +15,31 @@ enum State {
     Unknown,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Location {
     line: usize,
     column: usize,
+}
+
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
+    }
+}
+
+impl Ord for Location {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.line.cmp(&other.line) {
+            Ordering::Equal => self.column.cmp(&other.column),
+            x => x,
+        }
+    }
+}
+
+impl PartialOrd for Location {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[derive(Debug)]
@@ -30,13 +53,26 @@ struct Node {
 struct Rule {
     name: String,
     loc: Location,
+    next_loc: Option<Location>,
+}
+
+impl Rule {
+    #[allow(dead_code)]
+    fn is_zero_len(&self) -> bool {
+        if let Some(next_loc) = self.next_loc {
+            if next_loc > self.loc {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 #[derive(Debug)]
 enum Line {
     Attempt(Rule),
-    Failure,
-    Success,
+    Failure(Rule),
+    Success(Rule),
     Cache,
     EnterLevel,
     LeaveLevel,
@@ -48,21 +84,24 @@ peg::parser! {
             = "[PEG_TRACE] " l:line0() { l }
 
         rule line0() -> Line
-            = a:attempt() { Line::Attempt(a) }
+            = r:attempt() { Line::Attempt(r) }
+            / r:fail() { Line::Failure(r) }
+            / r:succ() { Line::Success(r) }
             / cach() { Line::Cache }
             / enter() { Line::EnterLevel }
             / leave() { Line::LeaveLevel }
-            / fail() { Line::Failure }
-            / succ() { Line::Success }
 
-        rule fail()
-            = "Failed to match rule " [_]*
+        rule attempt() -> Rule
+            = "Attempting to match rule " r:rule0() { r }
+
+        rule fail() -> Rule
+            = "Failed to match rule " r:rule0() { r }
+
+        rule succ() -> Rule
+            = "Matched rule " r:rule0() { r }
 
         rule cach()
             = "Cached match of rule " [_]*
-
-        rule succ()
-            = "Matched rule " [_]*
 
         rule enter()
             = "Entering level " [_]*
@@ -70,13 +109,24 @@ peg::parser! {
         rule leave()
             = "Leaving level " [_]*
 
-        rule attempt() -> Rule
-            = "Attempting to match rule " name:name() " at " loc:location() (" (pos " int() ")")? {
+        rule rule0() -> Rule
+            = name:name() at:at() {
                 Rule {
                     name: name.into(),
-                    loc,
+                    loc: at.0,
+                    next_loc: at.1,
                 }
             }
+
+        rule at() -> (Location, Option<Location>)
+            = at6()
+            / at5()
+
+        rule at5() -> (Location, Option<Location>)
+            = " at " at:location() " (pos " int() ")" { (at, None) }
+
+        rule at6() -> (Location, Option<Location>)
+            = " at " at:location() to:(" to " to:location() { to })? { (at, to) }
 
         rule backquoted<T>(e: rule<T>) -> T
             = "`" e:e() "`" { e }
@@ -99,16 +149,19 @@ peg::parser! {
 #[derive(FromArgs)]
 /// Creates an HTML visualization for a trace generated from https://crates.io/crates/peg
 struct Args {
+    #[argh(positional)]
+    input: Option<PathBuf>,
+
     #[argh(option, short = 'o')]
     /// output path, "./trace.html" for example
     output: PathBuf,
 
-    #[argh(option)]
+    #[argh(option, short = 'f')]
     /// name of rules to flatten - if they have only a single child,
     /// then only the child will appear in the tree
     flatten: Vec<String>,
 
-    #[argh(option)]
+    #[argh(option, short = 'h')]
     /// name of rules to hide altogether
     hide: Vec<String>,
 }
@@ -142,7 +195,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut trace_number = 1;
 
     let stdin = std::io::stdin();
-    for line in stdin.lock().lines() {
+    let stream = match &args.input {
+        Some(input) => Box::new(BufReader::new(File::open(&input)?)) as Box<dyn BufRead>,
+        None => Box::new(stdin.lock()) as Box<dyn BufRead>,
+    };
+
+    for line in stream.lines() {
         let line = line?;
 
         match state {
@@ -161,6 +219,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         rule: Rule {
                             name: format!("Trace #{}", trace_number),
                             loc: Location { column: 0, line: 0 },
+                            next_loc: None,
                         },
                         state: State::Success,
                         children: vec![],
@@ -200,13 +259,26 @@ fn main() -> Result<(), Box<dyn Error>> {
                         };
                         stack.push(node);
                     }
-                    Line::Success => {
+                    Line::Success(rule) => {
                         let mut node = stack.pop().unwrap();
+                        if rule.name != node.rule.name {
+                            panic!(
+                                "pegviz: expected rule {:?} to finish, but got {:?}",
+                                rule.name, node.rule.name
+                            );
+                        }
                         node.state = State::Success;
+                        node.rule.next_loc = rule.next_loc;
                         stack.last_mut().unwrap().children.push(node);
                     }
-                    Line::Failure => {
+                    Line::Failure(rule) => {
                         let mut node = stack.pop().unwrap();
+                        if rule.name != node.rule.name {
+                            panic!(
+                                "pegviz: expected rule {:?} to finish, but got {:?}",
+                                rule.name, node.rule.name
+                            );
+                        }
                         node.state = State::Failure;
                         stack.last_mut().unwrap().children.push(node);
                     }
@@ -240,9 +312,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     "#,
         style = include_str!("style.css")
     )?;
+
+    for trace in &mut traces {
+        backfill_next_loc(&mut trace.0, None);
+    }
+
     for trace in &traces {
         let (root, input) = &trace;
-        visit(&mut out, &args, root, None, input)?;
+        visit(&mut out, &args, root, input)?;
     }
     writeln!(
         &mut out,
@@ -255,6 +332,52 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("= pegviz generated to {}", args.output.display());
 
     Ok(())
+}
+
+#[allow(unused)]
+fn print_backfilled(node: &Node, state: &str) {
+    #[cfg(feature = "debug-backfill")]
+    {
+        if node.rule.is_zero_len() {
+            return;
+        }
+
+        if let Some(next_loc) = node.rule.next_loc {
+            println!(
+                "{name:?} {state}: {from}-{to}",
+                name = node.rule.name,
+                state = state,
+                from = node.rule.loc,
+                to = next_loc,
+            );
+        }
+    }
+}
+
+fn backfill_next_loc(node: &mut Node, next: Option<&Node>) {
+    for i in 1..node.children.len() {
+        if let ([prev], [next]) = &mut node.children[i - 1..i + 1].split_at_mut(1) {
+            if prev.rule.next_loc.is_none() {
+                prev.rule.next_loc = Some(next.rule.loc.clone());
+                print_backfilled(prev, "backfilled");
+            } else {
+                print_backfilled(prev, "parsed");
+            }
+            backfill_next_loc(prev, Some(next));
+        }
+    }
+
+    if let Some(last) = node.children.last_mut() {
+        if let Some(next) = next {
+            if last.rule.next_loc.is_none() {
+                last.rule.next_loc = Some(next.rule.loc.clone());
+                print_backfilled(last, "backfilled");
+            } else {
+                print_backfilled(last, "parsed");
+            }
+        }
+        backfill_next_loc(last, next)
+    }
 }
 
 impl Location {
@@ -281,20 +404,13 @@ impl Location {
     }
 }
 
-fn visit(
-    f: &mut dyn Write,
-    args: &Args,
-    node: &Node,
-    next: Option<&Node>,
-    input: &str,
-) -> Result<(), Box<dyn Error>> {
+fn visit(f: &mut dyn Write, args: &Args, node: &Node, input: &str) -> Result<(), Box<dyn Error>> {
     if args.should_flatten(node) {
-        return visit(f, args, &node.children[0], next, input);
+        return visit(f, args, &node.children[0], input);
     }
 
     let rule = &node.rule;
 
-    let next_rule = next.map(|n| &n.rule);
     write!(
         f,
         r#"
@@ -322,8 +438,8 @@ fn visit(
         }..rule.loc.pos(input)]
     )?;
     let rulepos = rule.loc.pos(input);
-    if let Some(next) = next_rule {
-        let nextpos = next.loc.pos(input);
+    if let Some(next_loc) = rule.next_loc.as_ref() {
+        let nextpos = next_loc.pos(input);
         if nextpos > rulepos {
             write!(f, r#"<strong>{}</strong>"#, &input[rulepos..nextpos])?;
         } else if nextpos < rulepos {
@@ -353,19 +469,11 @@ fn visit(
     }
 
     writeln!(f, "</code></summary>")?;
-    let mut prev_child = None;
     for child in &node.children {
         if args.should_hide(child) {
             continue;
         }
-
-        if let Some(prev) = prev_child {
-            visit(f, args, prev, Some(child), input)?;
-        }
-        prev_child = Some(child);
-    }
-    if let Some(prev) = prev_child {
-        visit(f, args, prev, next, input)?;
+        visit(f, args, child, input)?;
     }
     writeln!(f, "</details>")?;
 
