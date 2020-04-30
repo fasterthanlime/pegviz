@@ -101,7 +101,7 @@ peg::parser! {
             = "Matched rule " r:rule0() { r }
 
         rule cach()
-            = "Cached match of rule " [_]*
+            = "Cached " ("match" / "fail") " of rule " [_]*
 
         rule enter()
             = "Entering level " [_]*
@@ -110,6 +110,10 @@ peg::parser! {
             = "Leaving level " [_]*
 
         rule rule0() -> Rule
+            = rule1(<identifier()>, <at5()>)
+            / rule1(<backquoted(<identifier()>)>, <at6()>)
+
+        rule rule1(name: rule<&'input str>, at: rule<(Location, Option<Location>)>) -> Rule
             = name:name() at:at() {
                 Rule {
                     name: name.into(),
@@ -117,10 +121,6 @@ peg::parser! {
                     next_loc: at.1,
                 }
             }
-
-        rule at() -> (Location, Option<Location>)
-            = at6()
-            / at5()
 
         rule at5() -> (Location, Option<Location>)
             = " at " at:location() " (pos " int() ")" { (at, None) }
@@ -130,10 +130,6 @@ peg::parser! {
 
         rule backquoted<T>(e: rule<T>) -> T
             = "`" e:e() "`" { e }
-
-        rule name() -> &'input str
-            = n:backquoted(<identifier()>) { n }
-            / n:identifier() { n }
 
         rule identifier() -> &'input str
             = $(['A'..='Z' | 'a'..='z' | '0'..='9' | '_']*)
