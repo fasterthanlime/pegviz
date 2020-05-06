@@ -164,15 +164,11 @@ struct Args {
 
 impl Args {
     fn should_flatten(&self, node: &Node) -> bool {
-        self.flatten
-            .iter()
-            .find(|&x| x == &node.rule.name)
-            .is_some()
-            && node.children.len() == 1
+        self.flatten.iter().any(|x| x == &node.rule.name) && node.children.len() == 1
     }
 
     fn should_hide(&self, node: &Node) -> bool {
-        self.hide.iter().find(|&x| x == &node.rule.name).is_some()
+        self.hide.iter().any(|x| x == &node.rule.name)
     }
 }
 
@@ -356,7 +352,7 @@ fn backfill_next_loc(node: &mut Node, next: Option<&Node>) {
     for i in 1..node.children.len() {
         if let ([prev], [next]) = &mut node.children[i - 1..i + 1].split_at_mut(1) {
             if prev.rule.next_loc.is_none() {
-                prev.rule.next_loc = Some(next.rule.loc.clone());
+                prev.rule.next_loc = Some(next.rule.loc);
                 print_backfilled(prev, "backfilled");
             } else {
                 print_backfilled(prev, "parsed");
@@ -368,7 +364,7 @@ fn backfill_next_loc(node: &mut Node, next: Option<&Node>) {
     if let Some(last) = node.children.last_mut() {
         if let Some(next) = next {
             if last.rule.next_loc.is_none() {
-                last.rule.next_loc = Some(next.rule.loc.clone());
+                last.rule.next_loc = Some(next.rule.loc);
                 print_backfilled(last, "backfilled");
             } else {
                 print_backfilled(last, "parsed");
@@ -438,10 +434,14 @@ fn visit(f: &mut dyn Write, args: &Args, node: &Node, input: &str) -> Result<(),
     let rulepos = rule.loc.pos(input);
     if let Some(next_loc) = rule.next_loc.as_ref() {
         let nextpos = next_loc.pos(input);
-        if nextpos > rulepos {
-            write!(f, r#"<strong>{}</strong>"#, &input[rulepos..nextpos])?;
-        } else if nextpos < rulepos {
-            write!(f, r#"↩"#)?;
+        match nextpos.cmp(&rulepos) {
+            Ordering::Greater => {
+                write!(f, r#"<strong>{}</strong>"#, &input[rulepos..nextpos])?;
+            }
+            Ordering::Less => {
+                write!(f, r#"↩"#)?;
+            }
+            Ordering::Equal => {}
         }
         write!(
             f,
