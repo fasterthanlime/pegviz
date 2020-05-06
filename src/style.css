@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans&family=Source+Code+Pro&display=swap');
 
+* {
+    box-sizing: border-box;
+}
+
 body {
     font-family: 'Open Sans', sans-serif;
     line-height: 1.6;
@@ -12,8 +16,9 @@ code {
 
 code em, code strong, code span {
     background: #333;
-    padding-top: 2px;
-    padding-bottom: 2px;
+    border-radius: 2px;
+    padding-top: 4px;
+    padding-bottom: 4px;
 }
 
 code em {
@@ -33,9 +38,9 @@ body {
 }
 
 details {
-    user-select: none;
     cursor: pointer;
     padding-left: 30px;
+    margin-top: 2px;
 }
 
 summary {
@@ -48,21 +53,23 @@ summary {
 }
 
 span.rule {
-    padding-top: 2px;
-    padding-bottom: 2px;
+    margin: 2px;
+    padding: 2px;
     font-family: 'Source Code Pro', monospace;
     background: #333;
+    border: 2px solid #333;
+    border-radius: 2px;
     margin-right: 1em;
 }
 
 span.success {
-    background-color: #27966d;
+    border-color: #27966d;
 }
 span.failure {
-    background-color: #942c2c;
+    border-color: #942c2c;
     text-decoration: line-through;
 }
 span.failure.partial-match {
-    background-color: #ba8925;
+    border-color: #ba8925;
     text-decoration: initial;
 }
