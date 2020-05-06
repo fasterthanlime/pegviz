@@ -304,10 +304,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         <head>
         <meta charset="utf-8"/>
             <style>{style}</style>
+            <script>{script}</script>
         </head>
         <body>
+        <div id="notifications"></div>
     "#,
-        style = include_str!("style.css")
+        style = include_str!("style.css"),
+        script = include_str!("index.js")
     )?;
 
     for trace in &mut traces {

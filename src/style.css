@@ -4,6 +4,34 @@
     box-sizing: border-box;
 }
 
+#notifications {
+    position: fixed;
+    top: 0;
+    right: 0;
+}
+
+.notification {
+    transition: position 0.4s;
+
+    padding: 8px;
+    margin: 8px;
+    background: #333;
+    border: #666;
+    border-radius: 2px;
+    animation: fadein .4s;
+}
+
+@keyframes fadein {
+    0% {
+        transform: translateY(-20%);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0%);
+        opacity: 1;
+    }
+}
+
 body {
     font-family: 'Open Sans', sans-serif;
     line-height: 1.6;
@@ -39,6 +67,7 @@ body {
 
 details {
     cursor: pointer;
+    user-select: none;
     padding-left: 30px;
     margin-top: 2px;
 }
