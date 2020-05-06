@@ -62,3 +62,7 @@ span.failure {
     background-color: #942c2c;
     text-decoration: line-through;
 }
+span.failure.partial-match {
+    background-color: #ba8925;
+    text-decoration: initial;
+}

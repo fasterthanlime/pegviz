@@ -45,6 +45,7 @@ impl PartialOrd for Location {
 #[derive(Debug)]
 struct Node {
     rule: Rule,
+    partial_match: bool,
     state: State,
     children: Vec<Node>,
 }
@@ -213,6 +214,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             loc: Location { column: 0, line: 0 },
                             next_loc: None,
                         },
+                        partial_match: false,
                         state: State::Success,
                         children: vec![],
                     });
@@ -248,6 +250,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             rule,
                             state: State::Unknown,
                             children: vec![],
+                            partial_match: false,
                         };
                         stack.push(node);
                     }
@@ -309,6 +312,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for trace in &mut traces {
         backfill_next_loc(&mut trace.0, None);
+        mark_partial_matches(&mut trace.0);
     }
 
     for trace in &traces {
@@ -346,6 +350,17 @@ fn print_backfilled(node: &Node, state: &str) {
             );
         }
     }
+}
+
+fn mark_partial_matches(node: &mut Node) -> bool {
+    for c in &mut node.children {
+        mark_partial_matches(c);
+    }
+
+    let ret = (matches!(node.state, State::Success) && !node.rule.is_zero_len())
+        || node.children.iter().any(|c| c.partial_match);
+    node.partial_match = ret;
+    ret
 }
 
 fn backfill_next_loc(node: &mut Node, next: Option<&Node>) {
@@ -410,12 +425,17 @@ fn visit(f: &mut dyn Write, args: &Args, node: &Node, input: &str) -> Result<(),
         r#"
     <details>
         <summary>
-        <span class="rule {class}">{name}</span>
+        <span class="rule {class} {class2}">{name}</span>
         <code>"#,
         class = match node.state {
             State::Success => "success",
             State::Failure => "failure",
             State::Unknown => "unknown",
+        },
+        class2 = if node.partial_match {
+            "partial-match"
+        } else {
+            ""
         },
         name = rule.name
     )?;
