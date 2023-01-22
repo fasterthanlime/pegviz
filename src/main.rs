@@ -7,6 +7,7 @@ use std::{
     io::{BufRead, BufReader, Write},
     path::PathBuf,
 };
+use html_escape::encode_text;
 
 #[derive(Debug)]
 enum State {
@@ -448,18 +449,18 @@ fn visit(f: &mut dyn Write, args: &Args, node: &Node, input: &str) -> Result<(),
     write!(
         f,
         r#"<em>{}</em>"#,
-        &input[if rule.loc.pos(input) < before {
+        encode_text(&input[if rule.loc.pos(input) < before {
             0
         } else {
             rule.loc.pos(input) - before
-        }..rule.loc.pos(input)]
+        }..rule.loc.pos(input)])
     )?;
     let rulepos = rule.loc.pos(input);
     if let Some(next_loc) = rule.next_loc.as_ref() {
         let nextpos = next_loc.pos(input);
         match nextpos.cmp(&rulepos) {
             Ordering::Greater => {
-                write!(f, r#"<strong>{}</strong>"#, &input[rulepos..nextpos])?;
+                write!(f, r#"<strong>{}</strong>"#, encode_text(&input[rulepos..nextpos]))?;
             }
             Ordering::Less => {
                 write!(f, r#"↩"#)?;
@@ -469,7 +470,7 @@ fn visit(f: &mut dyn Write, args: &Args, node: &Node, input: &str) -> Result<(),
         write!(
             f,
             r#"<span>{}{}</span>"#,
-            &input[nextpos..std::cmp::min(nextpos + after, input.len())],
+            encode_text(&input[nextpos..std::cmp::min(nextpos + after, input.len())]),
             if input.len() > nextpos + after {
                 "…"
             } else {
@@ -480,7 +481,7 @@ fn visit(f: &mut dyn Write, args: &Args, node: &Node, input: &str) -> Result<(),
         write!(
             f,
             r#"<span>{}{}</span>"#,
-            &input[rulepos..std::cmp::min(rulepos + after, input.len())],
+            encode_text(&input[rulepos..std::cmp::min(rulepos + after, input.len())]),
             if input.len() > rulepos + after {
                 "…"
             } else {
