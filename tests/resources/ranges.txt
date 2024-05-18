@@ -1,0 +1,6 @@
+[PEG_INPUT_START]
+3729
+[PEG_TRACE_START]
+[PEG_TRACE] Attempting to match rule `nums` at 1:1
+[PEG_TRACE] Matched rule `nums` at 1:1 to 1:5
+[PEG_TRACE_STOP]

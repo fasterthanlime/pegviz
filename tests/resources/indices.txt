@@ -1,0 +1,11 @@
+[PEG_INPUT_START]
+Token 0
+Token 1
+Token 2
+Token 3
+Token 4
+Token 5
+[PEG_TRACE_START]
+[PEG_TRACE] Attempting to match rule `list` at 0
+[PEG_TRACE] Matched rule `list` at 0 to 5
+[PEG_TRACE_STOP]
