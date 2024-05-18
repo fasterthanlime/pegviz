@@ -94,6 +94,33 @@ pub rule toplevel() -> Toplevel = traced(<toplevel0()>)
 }}
 ```
 
+If your parser uses slices (such as `&[u8]`, `&[T]`), then each character or token must be on a new line.
+
+```rust
+peg::parser! { pub grammar example() for str {
+
+rule traced<T>(e: rule<T>) -> T =
+    &(input:$([_]*) {
+        #[cfg(feature = "trace")]
+        println!(
+            "[PEG_INPUT_START]\n{}\n[PEG_TRACE_START]",
+            input.iter().fold(
+                String::new(),
+                |s1, s2| s1 + "\n" + s2.to_string().as_str()
+            ).trim_start().to_string()
+        );
+    })
+    e:e()? {?
+        #[cfg(feature = "trace")]
+        println!("[PEG_TRACE_STOP]");
+        e.ok_or("")
+    }
+
+pub rule toplevel() -> Toplevel = traced(<toplevel0()>)
+
+}}
+```
+
 The above is the recommended way *if you're maintaining the grammar* and want
 to be able to turn on pegviz support anytime.
 
