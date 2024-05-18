@@ -15,19 +15,27 @@ enum State {
     Unknown,
 }
 
+// Location is the position of a statement in the source
+// text or slice.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+enum Location {
+    CharLocation(CharLocation),
+    TokenIndex(TokenIndex),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Location {
+struct CharLocation {
     line: usize,
     column: usize,
 }
 
-impl fmt::Display for Location {
+impl fmt::Display for CharLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.line, self.column)
     }
 }
 
-impl Ord for Location {
+impl Ord for CharLocation {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.line.cmp(&other.line) {
             Ordering::Equal => self.column.cmp(&other.column),
@@ -36,9 +44,20 @@ impl Ord for Location {
     }
 }
 
-impl PartialOrd for Location {
+impl PartialOrd for CharLocation {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct TokenIndex {
+    index: usize,
+}
+
+impl fmt::Display for TokenIndex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.index)
     }
 }
 
@@ -136,7 +155,13 @@ peg::parser! {
             = $(['A'..='Z' | 'a'..='z' | '0'..='9' | '_']*)
 
         rule location() -> Location
-            = line:int() ":" column:int() { Location { line, column } }
+            = range_location() / index_location()
+
+        rule range_location() -> Location
+            = line:int() ":" column:int() { Location::CharLocation(CharLocation { line, column } ) }
+
+        rule index_location() -> Location
+            = index:int() { Location::TokenIndex(TokenIndex { index } ) }
 
         rule int() -> usize
             = digits:$(['0'..='9']+) { digits.parse().unwrap() }
@@ -211,7 +236,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     stack.push(Node {
                         rule: Rule {
                             name: format!("Trace #{}", trace_number),
-                            loc: Location { column: 0, line: 0 },
+                            loc: Location::CharLocation(CharLocation { column: 0, line: 0 } ),
                             next_loc: None,
                         },
                         partial_match: false,
@@ -394,6 +419,16 @@ fn backfill_next_loc(node: &mut Node, next: Option<&Node>) {
 
 impl Location {
     fn pos(&self, input: &str) -> usize {
+        match self {
+            Location::CharLocation(char_loc) => char_loc.pos(input),
+            Location::TokenIndex(tok_idx) => tok_idx.pos(input),
+        }
+    }
+}
+
+impl CharLocation {
+    // returns the index of the character at the specified line and column
+    fn pos(&self, input: &str) -> usize {
         let mut line = 1;
         let mut column = 1;
 
@@ -409,6 +444,28 @@ impl Location {
                 }
                 _ => {
                     column += 1;
+                }
+            }
+        }
+        0
+    }
+}
+
+impl TokenIndex {
+    // returns the index of the character at the specified line and column
+    fn pos(&self, input: &str) -> usize {
+        let mut line = 0;
+
+        for (i, c) in input.chars().enumerate() {
+            if line == self.index {
+                return i;
+            }
+
+            match c {
+                '\n' => {
+                    line += 1;
+                }
+                _ => {
                 }
             }
         }
@@ -443,6 +500,7 @@ fn visit(f: &mut dyn Write, args: &Args, node: &Node, input: &str) -> Result<(),
         name = rule.name
     )?;
 
+    // Print up to 10 characters before and 25 characters after
     let before = 10;
     let after = 25;
     write!(
