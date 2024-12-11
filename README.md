@@ -10,11 +10,12 @@ Visualizer for https://crates.io/crates/peg parsers.
 
 `pegviz` reads peg's tracing markers and generates a collapsible HTML tree.
 
-![](https://user-images.githubusercontent.com/7998310/80628077-1fe05100-8a51-11ea-87aa-4b8362adf56c.png) 
+![](https://user-images.githubusercontent.com/7998310/80628077-1fe05100-8a51-11ea-87aa-4b8362adf56c.png)
 
 Left side:
 
   * Green: matched rule
+  * Yellow: partial match (see below)
   * Red: failed rule
 
 Right side:
@@ -22,6 +23,40 @@ Right side:
   * Gray: previous input, for context
   * Blue background: input matched by this rule
   * White text: rest of input after matching
+
+
+## Partial Matches
+
+A partial match is a (special kind of) match failure.
+It happens, if a rule consists of multiple sub-rules and some of them do match, but they do not all match.
+
+Consider for example the grammar
+
+```rust
+    pub rule traits() -> (Vec<String>, Vec<String>)
+    = awesome_traits:(awesome() ++ ". ") "."? " "?
+      boring_traits:(boring() ** ". ") "."?
+    {
+      (awesome_traits, boring_traits)
+    }
+
+    rule awesome() -> String
+    = name() " is awesome due to " reason:$(['a'..='z' | ' ']+) { reason.to_string() }
+
+    rule boring() -> String
+    = name() " is boring because of " reason:$(['a'..='z' | ' ']+) { reason.to_string() }
+
+    rule name() -> String = s:$(['A'..='Z']['a'..='z']+) { s.to_string() }
+```
+
+Here both `awesome` and `boring` start with `name()`.
+When parsing a string like
+
+    "Paul is awesome due to his kindness. Ludwig is boring because of his cat."
+
+the first sentence will match to the `awesome` rule, the second does not, but it _partially_ matches, because `Ludwig` also matches to `name()`.
+It will, though, match to the `boring` rule.
+
 
 ## Format
 
@@ -58,6 +93,7 @@ pegviz has been used with:
 
   * peg 0.5.7
   * peg 0.6.2
+  * peg 0.8.4
 
 There are no tests. It's quickly thrown together.
 
