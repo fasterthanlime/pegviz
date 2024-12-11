@@ -81,6 +81,8 @@ int a = 12 + 45;
 [PEG_TRACE] Failed to match rule `gnu` at 1:1
 [PEG_TRACE] Attempting to match rule `_` at 1:1
 [PEG_TRACE] Matched rule `_` at 1:1 to 1:1
+... <omitted> ...
+[PEG_TRACE_STOP]
 ```
 
 The `_START` and `_STOP` marker are pegviz-specific, you'll need to add
