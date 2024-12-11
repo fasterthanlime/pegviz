@@ -57,6 +57,8 @@ When parsing a string like
 the first sentence will match to the `awesome` rule, the second does not, but it _partially_ matches, because `Ludwig` also matches to `name()`.
 It will, though, match to the `boring` rule.
 
+![partial match](https://github.com/user-attachments/assets/99fe050d-2ba6-44a7-9a76-a3d96956d788)
+
 
 ## Format
 
