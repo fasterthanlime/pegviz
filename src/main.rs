@@ -214,7 +214,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let stdin = std::io::stdin();
     let stream = match &args.input {
-        Some(input) => Box::new(BufReader::new(File::open(&input)?)) as Box<dyn BufRead>,
+        Some(input) => Box::new(BufReader::new(File::open(input)?)) as Box<dyn BufRead>,
         None => Box::new(stdin.lock()) as Box<dyn BufRead>,
     };
 
@@ -236,7 +236,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     stack.push(Node {
                         rule: Rule {
                             name: format!("Trace #{}", trace_number),
-                            loc: Location::CharLocation(CharLocation { column: 0, line: 0 } ),
+                            loc: Location::CharLocation(CharLocation { column: 0, line: 0 }),
                             next_loc: None,
                         },
                         partial_match: false,
@@ -465,8 +465,7 @@ impl TokenIndex {
                 '\n' => {
                     line += 1;
                 }
-                _ => {
-                }
+                _ => {}
             }
         }
         0
