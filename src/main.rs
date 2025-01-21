@@ -460,12 +460,8 @@ impl TokenIndex {
             if line == self.index {
                 return i;
             }
-
-            match c {
-                '\n' => {
-                    line += 1;
-                }
-                _ => {}
+            if c == '\n' {
+                line += 1;
             }
         }
         0
