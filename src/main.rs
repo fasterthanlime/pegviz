@@ -199,7 +199,6 @@ impl Args {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    color_backtrace::install();
     let args: Args = argh::from_env();
 
     enum ParseState {
