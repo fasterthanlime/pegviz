@@ -1,8 +1,8 @@
 # pegviz
 
-![](https://img.shields.io/badge/quick%20hack%3F-yes!-green)
-![](https://img.shields.io/badge/maintained%3F-not%20really-red)
-![](https://img.shields.io/badge/license-mit-blue)
+![Quick hack status: Yes!](https://img.shields.io/badge/quick%20hack%3F-yes!-green)
+![Maintenance status: Not really](https://img.shields.io/badge/maintained%3F-not%20really-red)
+[![license: MIT/Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
 
 Visualizer for https://crates.io/crates/peg parsers.
 
