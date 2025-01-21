@@ -175,16 +175,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "0.1.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf6b25ee9ac1995c54d7adb2eff8cfffb7260bc774fb63c601ec65467f43cd9d"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
 name = "difflib"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -394,7 +384,6 @@ dependencies = [
  "argh",
  "assert_cmd",
  "color-backtrace",
- "ctor",
  "peg",
  "predicates",
  "tempfile",

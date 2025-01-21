@@ -199,6 +199,7 @@ impl Args {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    color_backtrace::install();
     let args: Args = argh::from_env();
 
     enum ParseState {
@@ -552,11 +553,4 @@ fn visit(f: &mut dyn Write, args: &Args, node: &Node, input: &str) -> Result<(),
     writeln!(f, "</details>")?;
 
     Ok(())
-}
-
-use ctor::ctor;
-
-#[ctor]
-fn install_extensions() {
-    color_backtrace::install();
 }
