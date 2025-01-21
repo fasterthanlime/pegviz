@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 debug-backfill = []
 
 [dependencies]
-peg = "0.6.2"
+peg = "0.8.4"
 argh = "0.1.13"
 
 [dev-dependencies]
