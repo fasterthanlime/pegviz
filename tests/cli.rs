@@ -10,13 +10,18 @@ pub fn path_to_test_resource(name: &'static str) -> PathBuf {
     path
 }
 
-#[test]
-fn main_when_valid_character_ranges_then_ok() -> Result<(), Box<dyn std::error::Error>> {
+use tempfile::NamedTempFile;
+
+fn run_pegviz(input_file: &'static str) -> Result<(), Box<dyn std::error::Error>> {
+    let temp_file = NamedTempFile::new()?;
+    let temp_path = temp_file.path().to_str().unwrap();
+
     let mut cmd = Command::cargo_bin("pegviz")?;
 
-    cmd.arg(path_to_test_resource("ranges.txt"))
+    cmd.arg(path_to_test_resource(input_file))
         .arg("--output")
-        .arg("output.html");
+        .arg(temp_path);
+
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("pegviz generated to"));
@@ -25,15 +30,11 @@ fn main_when_valid_character_ranges_then_ok() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
+fn main_when_valid_character_ranges_then_ok() -> Result<(), Box<dyn std::error::Error>> {
+    run_pegviz("ranges.txt")
+}
+
+#[test]
 fn main_when_valid_token_indices_then_ok() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin("pegviz")?;
-
-    cmd.arg(path_to_test_resource("indices.txt"))
-        .arg("--output") 
-        .arg("output.html");
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains("pegviz generated to"));
-
-    Ok(())
+    run_pegviz("indices.txt")
 }

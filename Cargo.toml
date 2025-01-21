@@ -17,4 +17,4 @@ ctor = "0.1.14"
 [dev-dependencies]
 assert_cmd = { version = "2.0" }
 predicates = { version = "3.0" }
-
+tempfile = "3.15.0"
