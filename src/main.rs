@@ -380,7 +380,7 @@ fn print_backfilled(node: &Node, state: &str) {
     }
 }
 
-fn mark_partial_matches(node: &mut Node) -> bool {
+fn mark_partial_matches(node: &mut Node) {
     for c in &mut node.children {
         mark_partial_matches(c);
     }
@@ -388,7 +388,6 @@ fn mark_partial_matches(node: &mut Node) -> bool {
     let ret = (matches!(node.state, State::Success) && !node.rule.is_zero_len())
         || node.children.iter().any(|c| c.partial_match);
     node.partial_match = ret;
-    ret
 }
 
 fn backfill_next_loc(node: &mut Node, next: Option<&Node>) {
