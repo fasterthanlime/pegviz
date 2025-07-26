@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum State {
     Success,
     Failure,
@@ -254,7 +254,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if line == "[PEG_TRACE_STOP]" {
                     println!("= pegviz trace stop");
                     assert_eq!(stack.len(), 1);
-                    let root = stack.pop().unwrap();
+                    let mut root = stack.pop().unwrap();
+                    let child = &root.children[0];
+                    root.state = child.state.clone();
                     traces.push((root, input.clone()));
                     input.clear();
                     state = ParseState::WaitingForInputStart;
