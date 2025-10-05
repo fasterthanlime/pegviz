@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum State {
     Success,
     Failure,
@@ -254,7 +254,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if line == "[PEG_TRACE_STOP]" {
                     println!("= pegviz trace stop");
                     assert_eq!(stack.len(), 1);
-                    let root = stack.pop().unwrap();
+                    let mut root = stack.pop().unwrap();
+                    let child = &root.children[0];
+                    root.state = child.state.clone();
                     traces.push((root, input.clone()));
                     input.clear();
                     state = ParseState::WaitingForInputStart;
@@ -380,7 +382,7 @@ fn print_backfilled(node: &Node, state: &str) {
     }
 }
 
-fn mark_partial_matches(node: &mut Node) -> bool {
+fn mark_partial_matches(node: &mut Node) {
     for c in &mut node.children {
         mark_partial_matches(c);
     }
@@ -388,7 +390,6 @@ fn mark_partial_matches(node: &mut Node) -> bool {
     let ret = (matches!(node.state, State::Success) && !node.rule.is_zero_len())
         || node.children.iter().any(|c| c.partial_match);
     node.partial_match = ret;
-    ret
 }
 
 fn backfill_next_loc(node: &mut Node, next: Option<&Node>) {
